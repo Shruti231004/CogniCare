@@ -28,6 +28,7 @@
 - [🌟 Overview & Clinical Motivation](#-overview--clinical-motivation)
 - [✨ Key Features & Capabilities](#-key-features--capabilities)
 - [🏗️ System Architecture](#️-system-architecture)
+- [🔄 End-to-End User Flow Diagram](#-end-to-end-user-flow-diagram)
 - [🔬 Core AI & Engineering Modules](#-core-ai--engineering-modules)
   - [1. Ensemble Stroke Risk Classifier (ML)](#1-ensemble-stroke-risk-classifier-ml)
   - [2. 5-Stage Brain MRI Segmentation (CV)](#2-5-stage-brain-mri-segmentation-cv)
@@ -125,6 +126,71 @@ flowchart TD
     MLEngine --> Models
     CVEngine --> Samples
     Models --> Dataset
+```
+
+---
+
+## 🔄 End-to-End User Flow Diagram
+
+<p align="center">
+  <img src="user_flow_diagram.png" alt="CogniCare AI End-to-End User Flow" width="850">
+</p>
+
+```mermaid
+flowchart TD
+    %% Entry Point
+    Start(["🌐 User Enters CogniCare AI Platform"]) --> RoleSelect{"Select Access Role"}
+
+    %% ==========================================
+    %% PATIENT JOURNEY
+    %% ==========================================
+    subgraph PatientJourney ["🧑‍⚕️ 1. Patient Self-Assessment Journey"]
+        RoleSelect -->|"Patient Mode"| Intake["📝 Patient Intake: Full Name & Email Registration"]
+        Intake --> Step1["Step 1: Clinical Symptom Input (Voice Whisper / Text)"]
+        Step1 --> NLP["🧠 Precision NLP: Entity Extraction & Negation Check"]
+        NLP --> Step2["Step 2: Biomarkers & Vitals Input (Age, Glucose, BMI, BP)"]
+        Step2 --> ML["📊 ML Ensemble: Soft-Voting Stroke Risk Probability"]
+        ML --> Step3["Step 3: Interactive F.A.S.T. Stroke Assessment"]
+        Step3 --> Step4["Step 4: Upload-First Brain MRI Scan (Interactive Dropzone)"]
+        Step4 --> CV["🔬 CV Segmentation: Infarct Area % & ASPECTS Score"]
+        CV --> Step5["Step 5: Assessment Summary & Recovery Care Plan"]
+        
+        Step5 --> ViewDocOrder["📋 View Verified Doctor Follow-Up Order"]
+        Step5 --> SendEmail["📧 Email Complete Care Plan (+ In-Browser HTML Preview)"]
+        Step5 --> NearbyHospitals["🏥 View Recommended Nearby Stroke Centers"]
+        
+        NearbyHospitals --> TriageCheck{"Acute Emergency?"}
+        TriageCheck -->|"Immediate Threat"| Dial108["🚨 One-Tap 108 Emergency Ambulance Call"]
+        TriageCheck -->|"Routine Route"| Directions["🚗 Google Maps Turn-by-Turn Driving Directions"]
+    end
+
+    %% ==========================================
+    %% DOCTOR WORKSTATION
+    %% ==========================================
+    subgraph DoctorJourney ["👨‍⚕️ 2. Doctor Clinical Workstation"]
+        RoleSelect -->|"Doctor Mode"| DocAuth["🔑 Provider Login (Dr. Sarah Lin, MD)"]
+        DocAuth --> TriageQueue["📋 Live Patient Triage Queue & Priority Flagging"]
+        TriageQueue --> SelectPatient["🔍 Inspect Patient Case Record (e.g., PT-4091)"]
+        SelectPatient --> ReviewData["🩺 Review Vitals, Risk Scores, and Segmented MRI Scan"]
+        ReviewData --> GenSOAP["✍️ MedAlly AI: Generate Clinical SOAP Note"]
+        GenSOAP --> DocAction{"Physician Clinical Action"}
+        
+        DocAction -->|"Audit & Sign"| SignEHR["🖋️ Verify, Override & Export to EHR"]
+        DocAction -->|"Schedule Follow-Up"| OrderFollowUp["📅 Order Follow-Up (Timeline, Consultation Mode & Guidance)"]
+        
+        OrderFollowUp --> PushCarePlan["🔄 Push Verified Order to Patient Assessment View"]
+        PushCarePlan --> EmailFollowUp["📧 Email Follow-Up Order & SOAP Notes Directly to Patient"]
+    end
+
+    %% ==========================================
+    %% ADMINISTRATOR HUB
+    %% ==========================================
+    subgraph AdminJourney ["🛡️ 3. Administrator & Operations Hub"]
+        RoleSelect -->|"Admin Mode"| AdminAuth["🔒 Administrator Login"]
+        AdminAuth --> Telemetry["📈 Platform Telemetry: Uptime, Requests & Active ML Models"]
+        Telemetry --> APIConfig["⚙️ Live API Health & Credential Configuration"]
+        APIConfig --> AuditLogs["📜 Audit Security Trails & Patient Data Logs"]
+    end
 ```
 
 ---
