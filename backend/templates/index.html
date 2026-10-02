@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CogniCare AI — Smart Stroke Risk Assessment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+                        serif: ['Lora', 'Georgia', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#e6faf8',
+                            100: '#ccf5f1',
+                            200: '#99ece3',
+                            300: '#66e2d5',
+                            400: '#33d9c7',
+                            500: '#00c2b2',
+                            600: '#00a89a',
+                            700: '#008e82',
+                            800: '#00746b',
+                            900: '#005a53',
+                        },
+                        navy: {
+                            800: '#111e38',
+                            900: '#0b192c',
+                            950: '#060e1a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Outfit', sans-serif; letter-spacing: -0.012em; }
+        h1, h2, h3, .font-heading { font-family: 'Outfit', sans-serif; }
+        .font-editorial { font-family: 'Lora', serif; }
+        
+        .app-view { display: none; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .app-view.active { display: block; }
+        .flow-step { display: none; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .flow-step.active { display: block; }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .step-dot.active { background-color: #00c2b2; color: #fff; font-weight: 700; box-shadow: 0 4px 14px rgba(0,194,178,0.35); cursor: pointer; }
+        .step-dot.completed { background-color: #ccf5f1; color: #00746b; font-weight: 600; cursor: pointer; }
+        .step-dot.locked { opacity: 0.5; cursor: not-allowed; background-color: #f1f5f9; color: #94a3b8; }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+
+        .recording-pulse { animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .entity-badge-symptom { background: rgba(239,68,68,0.1); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
+        .entity-badge-diagnosis { background: rgba(59,130,246,0.1); color: #2563eb; border: 1px solid rgba(59,130,246,0.25); }
+        .entity-badge-medication { background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+        .entity-badge-procedure { background: rgba(6,182,212,0.1); color: #0891b2; border: 1px solid rgba(6,182,212,0.25); }
+        .entity-badge-demographics { background: rgba(139,92,246,0.1); color: #7c3aed; border: 1px solid rgba(139,92,246,0.25); }
+        .entity-negated { text-decoration: line-through; opacity: 0.5; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- ================================================================== -->
+    <!-- LANDING PAGE (First thing users see) -->
+    <!-- ================================================================== -->
+    <div id="viewLanding" class="app-view active">
+        
+        <!-- Landing Nav -->
+        <nav class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/50 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="showView('landing')">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-navy-900 via-slate-900 to-brand-500 text-white flex items-center justify-center text-xl shadow-md shadow-brand-500/20">
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <div>
+                        <span class="font-extrabold text-lg tracking-tight text-slate-900">CogniCare<span class="text-brand-500">AI</span></span>
+                        <p class="text-[11px] text-slate-500 font-medium hidden sm:block">Smart Stroke Risk Assessment Platform</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="#features" class="text-xs font-semibold text-slate-600 hover:text-brand-600 transition hidden md:block">Features</a>
+                    <a href="#how-it-works" class="text-xs font-semibold text-slate-600 hover:text-brand-600 transition hidden md:block">How It Works</a>
+                    <button onclick="showView('auth')" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition">
+                        Get Started <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-navy-900 via-slate-900 to-brand-900"></div>
+            <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-6">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold text-brand-300 border border-white/10">
+                            <i class="fa-solid fa-shield-heart text-brand-400"></i>
+                            AI-Powered Health Assessment
+                        </span>
+                        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+                            Know Your <span class="text-brand-400">Stroke Risk</span> in Minutes
+                        </h1>
+                        <p class="text-slate-300 text-base md:text-lg leading-relaxed max-w-lg">
+                            Answer a few simple questions about your health, and our AI will assess your stroke risk, analyze brain scans, and connect you with the right care — all in one place.
+                        </p>
+                        <div class="flex flex-wrap gap-3 pt-2">
+                            <button onclick="showView('auth')" class="px-7 py-3.5 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm shadow-lg shadow-brand-600/30 transition flex items-center gap-2">
+                                <i class="fa-solid fa-heart-pulse"></i>
+                                Start Free Assessment
+                            </button>
+                            <a href="#how-it-works" class="px-7 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm backdrop-blur-md border border-white/10 transition flex items-center gap-2">
+                                <i class="fa-solid fa-play-circle"></i>
+                                Learn How It Works
+                            </a>
+                        </div>
+                        <div class="flex items-center gap-6 pt-4 text-xs text-slate-400">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-brand-400"></i> Private & Secure</span>
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-clock text-brand-400"></i> Results in 2 Min</span>
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-user-doctor text-brand-400"></i> Doctor Reviewed</span>
+                        </div>
+                    </div>
+                    <div class="hidden lg:flex justify-center">
+                        <div class="relative">
+                            <div class="w-80 h-80 rounded-full bg-gradient-to-br from-brand-500/20 to-blue-500/10 flex items-center justify-center" style="animation: float 6s ease-in-out infinite;">
+                                <div class="w-60 h-60 rounded-full bg-gradient-to-br from-brand-500/30 to-blue-500/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-brain text-8xl text-brand-300/80"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="py-20 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6">
+                <div class="text-center max-w-2xl mx-auto mb-12">
+                    <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Why CogniCare AI</span>
+                    <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 mt-2">Everything You Need for Stroke Prevention</h2>
+                    <p class="text-slate-500 mt-3 text-sm">From initial screening to doctor consultation — we guide you every step of the way.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 hover:shadow-lg transition space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center text-xl"><i class="fa-solid fa-comments"></i></div>
+                        <h3 class="font-bold text-slate-900">Simple Health Check</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed">Describe your symptoms in plain language. Our AI understands what you mean and identifies important health signals.</p>
+                    </div>
+                    <div class="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 hover:shadow-lg transition space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl"><i class="fa-solid fa-chart-line"></i></div>
+                        <h3 class="font-bold text-slate-900">AI Risk Assessment</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed">Get a personalized stroke risk score based on your health data, with clear explanations of what factors matter most.</p>
+                    </div>
+                    <div class="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 hover:shadow-lg transition space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-xl"><i class="fa-solid fa-file-medical"></i></div>
+                        <h3 class="font-bold text-slate-900">Doctor-Ready Reports</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed">Your results are automatically prepared for your doctor, including scan analysis and personalized care recommendations.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works" class="py-20 bg-slate-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6">
+                <div class="text-center max-w-2xl mx-auto mb-12">
+                    <span class="text-xs font-bold uppercase tracking-wider text-brand-600">How It Works</span>
+                    <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 mt-2">4 Simple Steps to Know Your Risk</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-500 text-white flex items-center justify-center text-lg font-bold mx-auto shadow-lg shadow-brand-500/20">1</div>
+                        <h4 class="font-bold text-slate-900">Quick Screening</h4>
+                        <p class="text-sm text-slate-500">Answer emergency check questions to see if you need immediate help.</p>
+                    </div>
+                    <div class="text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-500 text-white flex items-center justify-center text-lg font-bold mx-auto shadow-lg shadow-brand-500/20">2</div>
+                        <h4 class="font-bold text-slate-900">Describe Symptoms</h4>
+                        <p class="text-sm text-slate-500">Tell us how you're feeling and enter your health numbers like blood sugar and BMI.</p>
+                    </div>
+                    <div class="text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-500 text-white flex items-center justify-center text-lg font-bold mx-auto shadow-lg shadow-brand-500/20">3</div>
+                        <h4 class="font-bold text-slate-900">Get Your Report</h4>
+                        <p class="text-sm text-slate-500">Receive a clear risk assessment with easy-to-understand explanations.</p>
+                    </div>
+                    <div class="text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-500 text-white flex items-center justify-center text-lg font-bold mx-auto shadow-lg shadow-brand-500/20">4</div>
+                        <h4 class="font-bold text-slate-900">Care Plan</h4>
+                        <p class="text-sm text-slate-500">Get personalized recommendations and connect with a specialist if needed.</p>
+                    </div>
+                </div>
+                <div class="text-center mt-12">
+                    <button onclick="showView('auth')" class="px-8 py-3.5 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm shadow-lg shadow-brand-500/20 transition">
+                        Start Your Assessment Now <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Landing Footer -->
+        <footer class="bg-navy-900 text-slate-400 py-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center"><i class="fa-solid fa-brain"></i></div>
+                    <span class="font-bold text-slate-300">CogniCare<span class="text-brand-400">AI</span></span>
+                </div>
+                <p>&copy; 2026 CogniCare AI. For educational purposes only. Not a substitute for professional medical advice.</p>
+                <div class="flex gap-4">
+                    <span class="hover:text-brand-400 cursor-pointer">Privacy Policy</span>
+                    <span class="hover:text-brand-400 cursor-pointer">Terms of Use</span>
+                    <span class="hover:text-brand-400 cursor-pointer">Contact</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- AUTH / LOGIN PAGE -->
+    <!-- ================================================================== -->
+    <div id="viewAuth" class="app-view">
+        <div class="min-h-screen bg-gradient-to-br from-slate-50 to-brand-50/30 flex items-center justify-center p-4">
+            <div class="max-w-md w-full space-y-6">
+                
+                <!-- Back to landing -->
+                <button onclick="showView('landing')" class="text-xs font-semibold text-slate-500 hover:text-brand-600 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Home
+                </button>
+
+                <!-- Auth Card -->
+                <div class="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border border-slate-200/80 space-y-6">
+                    <div class="text-center space-y-2">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-navy-900 to-brand-500 text-white flex items-center justify-center text-2xl mx-auto shadow-lg shadow-brand-500/20">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Welcome to CogniCare<span class="text-brand-500">AI</span></h2>
+                        <p class="text-sm text-slate-500">Choose how you'd like to sign in</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Patient Intake / Registration Form -->
+                        <div class="p-6 rounded-3xl bg-white border-2 border-brand-500 shadow-md shadow-brand-500/5 space-y-4">
+                            <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+                                <div class="w-10 h-10 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center text-lg shrink-0">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                </div>
+                                <div>
+                                    <strong class="text-slate-900 block font-bold text-sm">Patient Assessment Portal</strong>
+                                    <span class="text-[11px] text-slate-500">Enter your details before beginning</span>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3 text-xs">
+                                <div>
+                                    <label class="font-bold text-slate-800 block mb-1">Your Full Name <span class="text-red-500">*</span></label>
+                                    <input type="text" id="patientRegName" value="John Doe" class="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition text-xs" placeholder="e.g. John Doe">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-slate-800 block mb-1">Email Address (to receive Care Plan) <span class="text-red-500">*</span></label>
+                                    <input type="email" id="patientRegEmail" value="john.doe@email.com" class="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition text-xs" placeholder="e.g. john.doe@email.com">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-slate-800 block mb-1">Contact Phone Number (Optional)</label>
+                                    <input type="tel" id="patientRegPhone" value="+91 98765 43210" class="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition text-xs" placeholder="e.g. +91 98765 43210">
+                                </div>
+                            </div>
+
+                            <button onclick="startPatientAssessment()" class="w-full py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md shadow-brand-500/20 transition flex items-center justify-center gap-2">
+                                <span>Start Health Assessment &rarr;</span>
+                            </button>
+                        </div>
+
+                        <!-- Healthcare Provider Quick Logins -->
+                        <div class="pt-2 border-t border-slate-200 space-y-2">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">Are you a healthcare provider?</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="loginAs('doctor', 'Dr. Sarah Lin, MD', 'dr.sarah@hospital.com')" class="p-3 rounded-2xl border border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50 text-left flex items-center gap-2.5 transition">
+                                    <i class="fa-solid fa-user-doctor text-blue-600"></i>
+                                    <div>
+                                        <strong class="text-xs font-bold text-slate-800 block">Doctor</strong>
+                                        <span class="text-[10px] text-slate-500">Sign in</span>
+                                    </div>
+                                </button>
+                                <button onclick="loginAs('admin', 'System Admin', 'admin@cognicare.ai')" class="p-3 rounded-2xl border border-slate-200 hover:border-slate-500 bg-slate-50 hover:bg-slate-100 text-left flex items-center gap-2.5 transition">
+                                    <i class="fa-solid fa-shield-halved text-slate-600"></i>
+                                    <div>
+                                        <strong class="text-xs font-bold text-slate-800 block">Admin</strong>
+                                        <span class="text-[10px] text-slate-500">Sign in</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-center text-[11px] text-slate-400">
+                    For demo purposes, click any role to enter. No password required.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- MAIN APP (After Login) -->
+    <!-- ================================================================== -->
+    <div id="viewApp" class="app-view">
+        
+        <!-- App Header -->
+        <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="showView('landing')">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-navy-900 via-slate-900 to-brand-500 text-white flex items-center justify-center text-xl shadow-md shadow-brand-500/20 shrink-0">
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-lg tracking-tight text-slate-900">CogniCare<span class="text-brand-500">AI</span></span>
+                            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-800 border border-brand-200" id="roleBadge">Patient</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <!-- Role Switcher (small tabs) -->
+                    <div class="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/80 text-xs font-bold">
+                        <button id="navPatient" onclick="switchRole('patient')" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-white text-brand-800 shadow-sm font-bold">
+                            <i class="fa-solid fa-user text-brand-500"></i> <span class="hidden sm:inline">Patient</span>
+                        </button>
+                        <button id="navDoctor" onclick="switchRole('doctor')" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+                            <i class="fa-solid fa-user-doctor text-blue-600"></i> <span class="hidden sm:inline">Doctor</span>
+                        </button>
+                        <button id="navAdmin" onclick="switchRole('admin')" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+                            <i class="fa-solid fa-shield-halved text-slate-700"></i> <span class="hidden sm:inline">Admin</span>
+                        </button>
+                    </div>
+
+                    <!-- User Profile -->
+                    <button onclick="showView('auth')" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 rounded-2xl transition text-xs font-semibold text-slate-700" title="Switch Account">
+                        <div class="w-6 h-6 rounded-full bg-navy-900 text-white flex items-center justify-center text-xs font-bold" id="userAvatar">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <span class="hidden lg:block text-[11px] font-bold text-slate-900" id="headerName">John Doe</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                    </button>
+
+                    <!-- Emergency -->
+                    <button onclick="triggerEmergency()" class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold border border-red-200 flex items-center gap-1.5 transition shrink-0">
+                        <i class="fa-solid fa-phone-volume text-red-600 animate-pulse"></i>
+                        <span class="hidden sm:inline">108 Emergency</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Patient Stepper (only visible for patient role) -->
+            <div id="stepperBar" class="border-t border-slate-100 bg-brand-50/50 px-4 py-2" style="display:none;">
+                <div class="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-2 text-xs font-semibold">
+                    <button onclick="navStep(1)" id="dot1" class="step-dot active px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0">
+                        <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">1</span>
+                        <span>Quick Screening</span>
+                    </button>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 shrink-0"></i>
+                    <button onclick="navStep(2)" id="dot2" class="step-dot locked px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0">
+                        <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px]">2</span>
+                        <span>Symptoms &amp; Health</span>
+                    </button>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 shrink-0"></i>
+                    <button onclick="navStep(3)" id="dot3" class="step-dot locked px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0">
+                        <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px]">3</span>
+                        <span>Risk Report</span>
+                    </button>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 shrink-0"></i>
+                    <button onclick="navStep(4)" id="dot4" class="step-dot locked px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0">
+                        <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px]">4</span>
+                        <span>Brain Scan</span>
+                    </button>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 shrink-0"></i>
+                    <button onclick="navStep(5)" id="dot5" class="step-dot locked px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0">
+                        <span class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px]">5</span>
+                        <span>Care Plan</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- App Content -->
+        <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1">
+
+            <!-- ============================== -->
+            <!-- PATIENT VIEW -->
+            <!-- ============================== -->
+            <div id="rolePatient" class="app-view active space-y-6">
+                
+                <!-- STEP 1: Quick Screening -->
+                <div id="step-1" class="flow-step active space-y-6">
+                    <div class="rounded-3xl p-8 md:p-12 bg-gradient-to-br from-navy-900 via-slate-900 to-brand-900 text-white shadow-xl space-y-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="space-y-2 max-w-2xl">
+                            <span class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold text-brand-300 border border-white/10">
+                                <i class="fa-solid fa-shield-heart"></i> Health Assessment
+                            </span>
+                            <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight">Let's Check How You're Feeling</h1>
+                            <p class="text-slate-300 text-sm md:text-base leading-relaxed">
+                                We'll guide you through a few simple steps to understand your health and check for any stroke risk factors. No medical knowledge needed.
+                            </p>
+                        </div>
+
+                        <!-- Patient Identity Confirmation Banner -->
+                        <div class="p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center font-bold text-xs shrink-0"><i class="fa-solid fa-user-check"></i></span>
+                                <div>
+                                    <strong class="text-white font-bold block" id="step1PatientName">Patient: John Doe</strong>
+                                    <span class="text-slate-300 text-[11px]" id="step1PatientEmail">Care plan will be delivered to: john.doe@email.com</span>
+                                </div>
+                            </div>
+                            <button onclick="showView('auth')" class="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold border border-white/20 transition">
+                                <i class="fa-solid fa-pen mr-1"></i> Edit Details
+                            </button>
+                        </div>
+
+                        <div class="pt-6 border-t border-white/10 space-y-4">
+                            <h3 class="text-sm font-bold text-brand-300">First, a quick safety check:</h3>
+                            <p class="text-base md:text-lg font-semibold text-white">Are you or someone near you experiencing sudden symptoms right now?</p>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                                <button onclick="openFastModal()" class="p-5 rounded-2xl bg-red-600/90 hover:bg-red-600 text-white text-left font-semibold text-xs border border-red-400 transition shadow-lg flex items-start gap-3.5 group">
+                                    <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-bolt-lightning"></i></div>
+                                    <div>
+                                        <strong class="block text-sm font-bold">Yes, sudden symptoms</strong>
+                                        <span class="text-[11px] text-red-100">Face droop, arm weakness, or speech problems &rarr; Quick emergency check</span>
+                                    </div>
+                                </button>
+                                <button onclick="completeStep1()" class="p-5 rounded-2xl bg-white hover:bg-brand-50 text-slate-900 text-left font-semibold text-xs transition shadow-lg flex items-start gap-3.5 group">
+                                    <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-800 flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-notes-medical"></i></div>
+                                    <div>
+                                        <strong class="block text-sm font-bold">No, I want a health check</strong>
+                                        <span class="text-[11px] text-slate-500">Continue to describe my symptoms and health details</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                        <div class="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                            <span class="w-8 h-8 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold text-sm"><i class="fa-solid fa-microphone-lines"></i></span>
+                            <strong class="text-slate-900 font-bold block">Voice or Text Input</strong>
+                            <p class="text-slate-500 text-[11px] leading-relaxed">Describe symptoms by speaking or typing — our AI understands natural language.</p>
+                        </div>
+                        <div class="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                            <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm"><i class="fa-solid fa-chart-pie"></i></span>
+                            <strong class="text-slate-900 font-bold block">Smart Risk Analysis</strong>
+                            <p class="text-slate-500 text-[11px] leading-relaxed">AI analyzes your health data and gives you a clear, easy-to-understand risk score.</p>
+                        </div>
+                        <div class="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                            <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm"><i class="fa-solid fa-file-waveform"></i></span>
+                            <strong class="text-slate-900 font-bold block">Personalized Care Plan</strong>
+                            <p class="text-slate-500 text-[11px] leading-relaxed">Get actionable health recommendations and a report ready for your doctor.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Symptoms & Health Inputs -->
+                <div id="step-2" class="flow-step space-y-6">
+                    <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Step 2 of 5</span>
+                                <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Tell Us About Your Health</h2>
+                                <p class="text-xs text-slate-500">Describe your symptoms and enter your health numbers below.</p>
+                            </div>
+                            <button onclick="toggleVoice()" id="voiceBtn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition">
+                                <i class="fa-solid fa-microphone text-brand-600" id="voiceIcon"></i>
+                                <span id="voiceLabel">Voice Input</span>
+                            </button>
+                        </div>
+
+                        <div id="validationAlert" class="hidden p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-3">
+                            <i class="fa-solid fa-triangle-exclamation text-red-500 text-base shrink-0"></i>
+                            <span id="validationMsg" class="font-semibold">Please fill in all required fields.</span>
+                        </div>
+
+                        <!-- Symptoms Description -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                    How are you feeling? <span class="text-red-500">*</span>
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] text-slate-400">Try:</span>
+                                    <button type="button" onclick="setSample('acute')" class="text-[11px] text-brand-700 hover:underline font-bold">Stroke symptoms</button>
+                                    <span class="text-slate-300">&bull;</span>
+                                    <button type="button" onclick="setSample('mild')" class="text-[11px] text-brand-700 hover:underline font-bold">General checkup</button>
+                                </div>
+                            </div>
+                            <textarea id="symptomsInput" oninput="detectSymptoms()" rows="3" class="w-full p-4 rounded-2xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm text-slate-800 transition" placeholder="e.g. I have a bad headache and feel dizzy. My right arm feels weak and I can't speak properly..."></textarea>
+                            
+                            <!-- Detected Symptoms -->
+                            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-wrap items-center gap-2 text-xs">
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                    <i class="fa-solid fa-tags text-brand-500"></i> Detected Symptoms:
+                                </span>
+                                <div id="detectedSymptoms" class="flex flex-wrap gap-1.5">
+                                    <span class="px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 font-semibold text-[11px]">Type your symptoms above</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Health Numbers -->
+                        <div class="space-y-3 pt-2">
+                            <label class="text-xs font-bold text-slate-900">Your Health Numbers <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                                    <span class="text-[11px] font-bold text-slate-500 block">Your Age</span>
+                                    <div class="relative">
+                                        <input type="number" id="inputAge" value="67" min="18" max="110" step="1" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition">
+                                        <span class="absolute right-3 top-3 text-[11px] text-slate-400 font-bold">years</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-400">18 - 110 years</span>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                                    <span class="text-[11px] font-bold text-slate-500 block">Average Blood Sugar</span>
+                                    <div class="relative">
+                                        <input type="number" id="inputGlucose" value="218.4" min="40" max="400" step="0.1" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition">
+                                        <span class="absolute right-3 top-3 text-[11px] text-slate-400 font-bold">mg/dL</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-400">Normal: 70 - 140 mg/dL</span>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                                    <span class="text-[11px] font-bold text-slate-500 block">BMI (Body Mass Index)</span>
+                                    <div class="relative">
+                                        <input type="number" id="inputBmi" value="32.2" min="10" max="70" step="0.1" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 text-base focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition">
+                                        <span class="absolute right-3 top-3 text-[11px] text-slate-400 font-bold">kg/m²</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-400">Normal: 18.5 - 24.9</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Medical History -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                            <label class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition">
+                                <div>
+                                    <strong class="text-xs text-slate-900 block font-bold">High Blood Pressure</strong>
+                                    <span class="text-[10px] text-slate-500">Do you have hypertension?</span>
+                                </div>
+                                <input type="checkbox" id="inputHypertension" checked class="w-5 h-5 rounded text-brand-600 focus:ring-brand-500">
+                            </label>
+                            <label class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition">
+                                <div>
+                                    <strong class="text-xs text-slate-900 block font-bold">Heart Problems</strong>
+                                    <span class="text-[10px] text-slate-500">Any heart condition history?</span>
+                                </div>
+                                <input type="checkbox" id="inputHeartDisease" checked class="w-5 h-5 rounded text-brand-600 focus:ring-brand-500">
+                            </label>
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                                <strong class="text-xs text-slate-900 block font-bold">Smoking</strong>
+                                <select id="inputSmoking" class="w-full p-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                                    <option value="1">Used to smoke</option>
+                                    <option value="2">Never smoked</option>
+                                    <option value="3">Currently smoking</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex justify-between">
+                            <button onclick="goStep(1)" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition">&larr; Back</button>
+                            <button id="btnAnalyze" onclick="analyzeHealth()" class="px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-600/20 transition flex items-center gap-2">
+                                <span>Analyze My Health &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Risk Report -->
+                <div id="step-3" class="flow-step space-y-6">
+                    <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Step 3 of 5 &bull; Your Results</span>
+                                <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Your Health Risk Report</h2>
+                                <p class="text-xs text-slate-500">Here's what our AI found based on your health information.</p>
+                            </div>
+                            <span id="riskBadge" class="px-4 py-1.5 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200">HIGH RISK</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                            <!-- Risk Gauge -->
+                            <div class="flex flex-col items-center justify-center p-6 rounded-3xl bg-slate-50 border border-slate-100">
+                                <div class="relative w-40 h-40">
+                                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                                        <circle cx="60" cy="60" r="50" fill="transparent" stroke="#e2e8f0" stroke-width="12"></circle>
+                                        <circle id="gaugeCircle" cx="60" cy="60" r="50" fill="transparent" stroke="#ef4444" stroke-width="12" stroke-dasharray="314.15" stroke-dashoffset="48" stroke-linecap="round" class="transition-all duration-1000"></circle>
+                                    </svg>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span class="text-3xl font-black text-slate-900 font-mono tracking-tight" id="riskPercent">84.6%</span>
+                                        <span class="text-[10px] uppercase font-bold text-slate-400">Risk Score</span>
+                                    </div>
+                                </div>
+                                <span class="mt-4 text-xs font-semibold text-slate-600 text-center">AI Health Assessment</span>
+                            </div>
+
+                            <!-- Key Risk Factors -->
+                            <div class="md:col-span-2 space-y-3">
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-chart-column text-brand-500"></i> Key Factors Affecting Your Risk
+                                </h4>
+                                <div class="space-y-2 text-xs" id="riskFactorsBox"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scan Question -->
+                        <div class="p-5 rounded-2xl bg-brand-50 border border-brand-100 space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shrink-0 text-sm"><i class="fa-solid fa-brain"></i></div>
+                                <div>
+                                    <h4 class="text-sm font-bold text-brand-950">Do you have a brain scan (MRI or CT)?</h4>
+                                    <p class="text-xs text-brand-800">If you have one, we can analyze it for more detailed results.</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-3 pt-1">
+                                <button onclick="goToScan()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md transition flex items-center gap-2">
+                                    <i class="fa-solid fa-file-medical"></i> Yes, Analyze My Scan &rarr;
+                                </button>
+                                <button onclick="skipToCarePlan()" class="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 transition">
+                                    No scan, go to Care Plan &rarr;
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100">
+                            <button onclick="goStep(2)" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition">&larr; Back</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4: Brain Scan -->
+                <div id="step-4" class="flow-step space-y-6">
+                    <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Step 4 of 5 &bull; Neuroimaging Analysis</span>
+                                <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Brain MRI / CT Scan Analysis</h2>
+                                <p class="text-xs text-slate-500">Upload your brain scan image for automated AI lesion mapping and severity scoring.</p>
+                            </div>
+                            <span id="scanStatusBadge" class="px-3.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200">
+                                <i class="fa-solid fa-cloud-arrow-up mr-1 text-slate-400"></i> No Scan Uploaded Yet
+                            </span>
+                        </div>
+
+                        <!-- 1. UPLOAD PROMPT SECTION (Default View) -->
+                        <div id="scanUploadArea" class="space-y-6">
+                            <div class="border-2 border-dashed border-slate-300 hover:border-brand-500 bg-slate-50/70 hover:bg-brand-50/20 rounded-3xl p-8 md:p-12 text-center transition cursor-pointer group" onclick="document.getElementById('patientScanFileInput').click()">
+                                <input type="file" id="patientScanFileInput" accept="image/*" class="hidden" onchange="handlePatientScanUpload(event)">
+                                <div class="w-16 h-16 rounded-3xl bg-brand-100 text-brand-700 flex items-center justify-center text-3xl mx-auto shadow-md shadow-brand-500/10 group-hover:scale-105 transition mb-4">
+                                    <i class="fa-solid fa-file-arrow-up"></i>
+                                </div>
+                                <h3 class="text-lg font-extrabold text-slate-900">Please Upload Your Brain Scan (MRI or CT)</h3>
+                                <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                                    Select an image file (PNG, JPG, or DICOM snapshot) from your hospital CD, smartphone photo of film, or patient portal.
+                                </p>
+                                <div class="mt-5 flex justify-center">
+                                    <span class="px-6 py-2.5 rounded-xl bg-brand-600 group-hover:bg-brand-700 text-white font-bold text-xs shadow-md transition flex items-center gap-2">
+                                        <i class="fa-solid fa-folder-open"></i> Choose Image File to Upload
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Sample Testing Fallback -->
+                            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-700 flex items-center gap-2">
+                                        <i class="fa-solid fa-flask-vial text-brand-600"></i> Don't have your scan file right now?
+                                    </span>
+                                    <span class="text-[11px] text-slate-400">Test with clinic sample scans:</span>
+                                </div>
+                                <div class="flex flex-wrap gap-2 text-xs">
+                                    <button type="button" onclick="loadSampleScan('mri_sample_stroke_left.png', 'Left MCA Infarct Scan')" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-brand-50 text-slate-700 font-bold border border-slate-200 hover:border-brand-300 transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-brain text-red-500"></i> Sample: Left MCA Stroke
+                                    </button>
+                                    <button type="button" onclick="loadSampleScan('mri_sample_stroke_right.png', 'Right MCA Infarct Scan')" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-brand-50 text-slate-700 font-bold border border-slate-200 hover:border-brand-300 transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-brain text-orange-500"></i> Sample: Right MCA Stroke
+                                    </button>
+                                    <button type="button" onclick="loadSampleScan('mri_sample_healthy.png', 'Normal Healthy Scan')" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-brand-50 text-slate-700 font-bold border border-slate-200 hover:border-brand-300 transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-brain text-emerald-500"></i> Sample: Healthy Control
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. ANALYZED RESULTS SECTION (Hidden until scan is uploaded) -->
+                        <div id="scanResultsArea" class="hidden space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                                <div class="p-4 rounded-3xl bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
+                                    <img id="scanImg" src="/static/mri_placeholder.png" alt="Brain Scan Analysis" class="rounded-2xl max-h-72 object-contain shadow-md">
+                                    <span class="absolute bottom-3 right-3 text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/70 text-brand-400">AI Lesion Overlay</span>
+                                </div>
+
+                                <div class="space-y-4 text-xs">
+                                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                                        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">AI Scan Findings</span>
+                                        <h3 class="text-base font-extrabold text-slate-900" id="scanTitle">Left Side Brain Area Affected</h3>
+                                        <p class="text-slate-600 leading-relaxed text-[11px]" id="scanSummary">
+                                            The scan shows a region in the left side of the brain that may be affected. About <strong id="scanArea" class="text-red-600 font-mono">18.4%</strong> of the brain tissue in this area shows changes.
+                                        </p>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                                            <span class="text-slate-400 block text-[10px]">Severity Score</span>
+                                            <strong class="text-xl font-bold text-slate-900 font-mono" id="scanScore">7 / 10</strong>
+                                        </div>
+                                        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                                            <span class="text-slate-400 block text-[10px]">Area Affected</span>
+                                            <strong class="text-sm font-bold text-slate-900" id="scanTerritory">Left Brain Region</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-2">
+                                        <button type="button" onclick="resetScanUpload()" class="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1.5 transition">
+                                            <i class="fa-solid fa-arrow-rotate-left"></i> Upload or Choose a Different Scan
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex justify-between">
+                            <button onclick="goStep(3)" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition">&larr; Back to Risk Report</button>
+                            <button onclick="goToCarePlan()" class="px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md transition flex items-center gap-2">
+                                <span>See Care Plan &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 5: Care Plan -->
+                <div id="step-5" class="flow-step space-y-6">
+                    <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Step 5 of 5 &bull; Your Care Plan</span>
+                                <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Your Health Summary &amp; Next Steps</h2>
+                                <p class="text-xs text-slate-500">Here's everything we found, with recommendations for you and your doctor.</p>
+                            </div>
+                            <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs shadow-md transition flex items-center gap-2 no-print">
+                                <i class="fa-solid fa-print"></i> Print Report
+                            </button>
+                        </div>
+
+                        <!-- DOCTOR'S OFFICIAL FOLLOW-UP CONSULTATION CARD -->
+                        <div id="patientFollowUpCard" class="p-6 rounded-3xl bg-blue-50/80 border-2 border-blue-200/80 shadow-sm space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/20 shrink-0">
+                                        <i class="fa-solid fa-calendar-check"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full" id="followUpBadge">Next Consultation Ordered</span>
+                                        <h3 class="text-base font-extrabold text-slate-900 mt-0.5">Doctor's Follow-up &amp; Care Guidance</h3>
+                                        <p class="text-xs text-slate-600">Personalized clinical next steps prescribed by your attending neurologist.</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold text-blue-900 block" id="followUpTimingDisplay">In 48 Hours</span>
+                                    <span class="text-[11px] text-blue-700 font-semibold" id="followUpTypeDisplay">In-Person Clinic Visit</span>
+                                </div>
+                            </div>
+
+                            <!-- Doctor's Personal Guidance -->
+                            <div class="p-4 rounded-2xl bg-white border border-blue-100 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-user-doctor text-blue-600"></i>
+                                        <span id="followUpDoctorDisplay">Dr. Sarah Lin, MD (Stroke Specialist)</span>
+                                    </span>
+                                    <span class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-bold">Verified Order</span>
+                                </div>
+                                <p class="text-xs text-slate-700 leading-relaxed italic font-serif" id="followUpInstructionsDisplay">
+                                    "Repeat neuro-vascular review &amp; Diffusion Brain MRI in 48 hours. Continue Aspirin 81mg and maintain daily morning BP log with target below 130/80 mmHg. Immediate return to ER if any weakness or speech difficulty recurs."
+                                </p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+                                <span class="text-slate-500 text-[11px]">
+                                    <i class="fa-solid fa-envelope text-blue-500 mr-1"></i> This official follow-up schedule and recovery order is sent directly to your registered email.
+                                </span>
+                                <button onclick="sendCarePlanEmail()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <span>Email My Follow-Up Order</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                                    <tr><th class="p-3">Category</th><th class="p-3">Your Result</th><th class="p-3">Healthy Range</th><th class="p-3">Recommendation</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="p-3 font-semibold">Risk Score</td>
+                                        <td class="p-3 font-mono font-bold text-red-600" id="finalRisk">84.6%</td>
+                                        <td class="p-3 text-slate-500">&lt; 30% Low Risk</td>
+                                        <td class="p-3 text-slate-700">See a doctor soon</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-semibold">Blood Sugar</td>
+                                        <td class="p-3 font-mono font-bold" id="finalGlucose">218.4 mg/dL</td>
+                                        <td class="p-3 text-slate-500">70 - 140 mg/dL</td>
+                                        <td class="p-3 text-slate-700">Blood sugar is too high</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-semibold">Brain Scan</td>
+                                        <td class="p-3 font-mono font-bold text-blue-600" id="finalScan">Left Brain Area (18.4%)</td>
+                                        <td class="p-3 text-slate-500">Normal</td>
+                                        <td class="p-3 text-slate-700">Follow up with specialist</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <h4 class="font-bold text-slate-900 text-sm">What You Can Do Every Day</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                                    <strong class="text-slate-900 block font-bold">1. Track Blood Pressure</strong>
+                                    <p class="text-slate-500 text-[11px]">Check your blood pressure every morning. Aim for below 130/80.</p>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                                    <strong class="text-slate-900 block font-bold">2. Take Your Medicine</strong>
+                                    <p class="text-slate-500 text-[11px]">Don't skip any prescribed medications. Set a daily reminder.</p>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                                    <strong class="text-slate-900 block font-bold">3. Eat Heart-Healthy</strong>
+                                    <p class="text-slate-500 text-[11px]">Reduce salt and processed food. Eat more fruits, vegetables, and whole grains.</p>
+                                </div>
+                        </div>
+
+                        <!-- EMAIL CARE PLAN DELIVERY CARD (DIRECT TO INBOX) -->
+                        <div class="p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100/60 border-2 border-blue-200/90 shadow-sm space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/30 shrink-0">
+                                        <i class="fa-solid fa-envelope-circle-check"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">Automatic Email Delivery</span>
+                                        <h3 class="text-base font-extrabold text-slate-900 mt-0.5">Send Complete Care Plan &amp; Doctor Follow-Up to Your Email</h3>
+                                        <p class="text-xs text-slate-600">Dispatches your full clinical report, blood pressure targets, and Dr. Sarah Lin's official follow-up order straight to your inbox.</p>
+                                    </div>
+                                </div>
+                                <span class="px-3 py-1 rounded-full bg-white text-blue-800 text-xs font-bold border border-blue-200 shadow-sm flex items-center gap-1.5">
+                                    <i class="fa-solid fa-check-double text-blue-600"></i> Direct to Inbox
+                                </span>
+                            </div>
+
+                            <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 pt-1">
+                                <div class="relative flex-1 w-full">
+                                    <span class="absolute left-3.5 top-3 text-xs text-slate-400 font-bold"><i class="fa-solid fa-at"></i></span>
+                                    <input type="email" id="carePlanEmailInput" value="john.doe@email.com" class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-blue-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 shadow-sm" placeholder="Enter recipient email address...">
+                                </div>
+                                <button onclick="sendCarePlanEmail()" id="btnSendEmail" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition flex items-center justify-center gap-2 shrink-0">
+                                    <i class="fa-solid fa-paper-plane text-xs"></i>
+                                    <span>Send to My Email</span>
+                                </button>
+                            </div>
+
+                            <div id="emailSuccessToast" class="hidden p-3.5 rounded-2xl bg-white border border-blue-200 text-blue-900 text-xs flex items-center justify-between gap-3 shadow-sm">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-check text-emerald-500 text-base"></i>
+                                    <span id="emailToastMsg" class="font-semibold">Care plan emailed successfully!</span>
+                                </div>
+                                <button onclick="openEmailPreviewModal()" class="px-3 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold text-[11px] transition shrink-0">
+                                    <i class="fa-solid fa-eye mr-1"></i> View Sent Email
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- RECOMMENDED NEARBY STROKE HOSPITALS CARD -->
+                        <div class="p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                                        <i class="fa-solid fa-hospital"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">Immediate Care Access</span>
+                                        <h3 class="text-base font-extrabold text-slate-900 mt-0.5">Recommended Nearby Stroke Hospitals</h3>
+                                        <p class="text-xs text-slate-500">Accredited centers equipped with 24/7 CT/MRI scanners, emergency stroke teams, and acute thrombolysis facilities.</p>
+                                    </div>
+                                </div>
+                                <button onclick="loadNearbyHospitals(true)" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5" title="Recalculate distance from current GPS">
+                                    <i class="fa-solid fa-location-crosshairs text-brand-600"></i>
+                                    <span>Update My Location</span>
+                                </button>
+                            </div>
+
+                            <!-- Hospital Cards Container -->
+                            <div id="hospitalsListContainer" class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                                <!-- Loaded dynamically via loadNearbyHospitals() -->
+                            </div>
+
+                            <!-- Emergency Alert Ribbon -->
+                            <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                <div class="flex items-center gap-2.5 text-rose-900">
+                                    <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+                                    <span class="text-[11px] font-semibold">Experiencing active stroke signs? <strong>Do not drive yourself.</strong> Call Emergency immediately.</span>
+                                </div>
+                                <a href="tel:108" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-sm transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-phone"></i> Call 108 Ambulance
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex justify-between">
+                            <button onclick="resetAssessment()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition">
+                                Start New Assessment
+                            </button>
+                            <button onclick="window.print()" class="px-6 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md transition flex items-center gap-2">
+                                <i class="fa-solid fa-download"></i> Save as PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================== -->
+            <!-- DOCTOR VIEW -->
+            <!-- ============================== -->
+            <div id="roleDoctor" class="app-view space-y-6">
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Clinical Workstation</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">Patient Review &amp; Clinical Notes</h2>
+                        <p class="text-xs text-slate-500">Patient context on the left &bull; Clinical SOAP note and billing on the right.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="generateSOAP()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md transition flex items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate SOAP Note
+                        </button>
+                        <span class="px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-800 font-bold text-xs border border-slate-200">
+                            <i class="fa-solid fa-user-doctor text-blue-600 mr-1"></i> Dr. Sarah Lin, MD
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Left: Patient Context -->
+                    <div class="lg:col-span-5 space-y-5">
+                        <!-- Patient Queue -->
+                        <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-hospital-user text-brand-600"></i> Patient Queue
+                                </h3>
+                                <span class="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold">1 Urgent</span>
+                            </div>
+                            <div class="space-y-2 text-xs" id="queueList"></div>
+                        </div>
+
+                        <!-- Clinical Transcript -->
+                        <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <i class="fa-solid fa-comment-medical text-brand-600"></i> Patient Notes
+                            </h3>
+                            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-700 leading-relaxed italic font-serif" id="transcript">
+                                "Patient presented with sudden right arm weakness, facial drooping on the right side, and slurred speech starting 01h 45m ago. History of severe hypertension."
+                            </div>
+                            <div class="space-y-1.5">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key Findings:</span>
+                                <div class="flex flex-wrap gap-1.5 text-xs">
+                                    <span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-mono text-[10px] font-bold border border-red-200">Onset: 1.75h ago</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-mono text-[10px] font-bold border border-blue-200">F.A.S.T.: Positive</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-mono text-[10px] font-bold border border-teal-200">Glucose: 218 mg/dL</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MRI Preview -->
+                        <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-brain text-brand-600"></i> Brain Scan Review
+                                </h3>
+                                <span class="text-[10px] font-mono font-bold text-brand-700">ASPECTS: 7/10</span>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <img src="/static/mri_placeholder.png" id="docMriThumb" alt="MRI" class="w-20 h-20 rounded-2xl bg-slate-900 object-cover border border-slate-200 shrink-0">
+                                <div class="text-xs space-y-1">
+                                    <strong class="text-slate-900 block font-bold">Left MCA Acute Ischemic Lesion</strong>
+                                    <p class="text-slate-500 text-[11px]">AI segmentation detected 18.4% lesion ratio in left middle cerebral artery territory.</p>
+                                    <span class="text-red-600 font-bold text-[10px] font-mono">Thrombolysis Window Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: SOAP Note -->
+                    <div class="lg:col-span-7 space-y-5">
+                        <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
+                            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                <div>
+                                    <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Clinical Documentation</span>
+                                    <h3 class="text-lg font-black text-slate-900">SOAP Note</h3>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-mono font-bold border border-slate-200">ICD-10: I63.9</span>
+                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-mono font-bold border border-slate-200">CPT: 99214</span>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 text-xs">
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
+                                    <span class="font-bold text-brand-800 font-mono text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-user-pen text-brand-600"></i> Subjective (S)
+                                    </span>
+                                    <textarea id="soapS" rows="2" class="w-full bg-transparent border-0 focus:ring-0 text-slate-800 text-xs p-0 resize-none font-medium">Acute focal neurological deficit in a 67-year-old Male. Patient presents with sudden right arm weakness, facial droop, and speech slur. Onset within 1h 45m. F.A.S.T. positive.</textarea>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
+                                    <span class="font-bold text-brand-800 font-mono text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-stethoscope text-brand-600"></i> Objective (O)
+                                    </span>
+                                    <textarea id="soapO" rows="2" class="w-full bg-transparent border-0 focus:ring-0 text-slate-800 text-xs p-0 resize-none font-medium">Vitals: Blood Glucose 218.4 mg/dL (Hyperglycemic), BMI 32.2 kg/m². Neuro Exam: Right motor deficit. Brain MRI: Left MCA Territory Infarct (18.4% Area, ASPECTS: 7/10).</textarea>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
+                                    <span class="font-bold text-brand-800 font-mono text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-brain text-brand-600"></i> Assessment (A)
+                                    </span>
+                                    <textarea id="soapA" rows="2" class="w-full bg-transparent border-0 focus:ring-0 text-slate-800 text-xs p-0 resize-none font-medium">Acute Ischemic Cerebrovascular Event (Stroke) — High Confidence. AI Risk Score: 84.6% (STAT Alert). Primary Diagnosis: Cerebral infarction, unspecified (ICD-10: I63.9).</textarea>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
+                                    <span class="font-bold text-brand-800 font-mono text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-clipboard-check text-brand-600"></i> Plan (P)
+                                    </span>
+                                    <textarea id="soapP" rows="3" class="w-full bg-transparent border-0 focus:ring-0 text-slate-800 text-xs p-0 resize-none font-medium">1. Emergency neuro-vascular evaluation & STAT Head CT/Diffusion MRI.
+2. Thrombolysis (r-tPA) eligibility check within 4.5h window.
+3. STAT blood glucose normalization & telemetry monitoring. CPT Codes: 99214, 70553.</textarea>
+                                </div>
+
+                                <!-- Follow-up Consultation Order -->
+                                <div class="p-4 rounded-2xl bg-blue-50/80 border border-blue-200/80 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-bold text-blue-900 font-mono text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                            <i class="fa-solid fa-calendar-check text-blue-600"></i> Doctor's Follow-up Order (F)
+                                        </span>
+                                        <span class="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200">Syncs to Patient Portal</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div>
+                                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Follow-up Window</label>
+                                            <select id="docFollowUpTimeline" class="w-full p-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                                                <option value="24 Hours">STAT: Within 24 Hours</option>
+                                                <option value="48 Hours" selected>Urgent: Within 48 Hours</option>
+                                                <option value="1 Week">Subacute: Within 1 Week</option>
+                                                <option value="1 Month">Secondary Prevention: In 1 Month</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Consultation Mode</label>
+                                            <select id="docFollowUpType" class="w-full p-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                                                <option value="In-Person Clinic Visit" selected>In-Person Clinic Visit</option>
+                                                <option value="Telehealth Video Review">Telehealth Video Review</option>
+                                                <option value="Home Neuro Check">Home Neuro Check</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Doctor's Guidance to Patient</label>
+                                        <textarea id="docFollowUpNotes" rows="2" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 font-medium">Repeat neuro-vascular review & Diffusion MRI in 48 hours. Continue Aspirin 81mg and maintain daily morning BP log with target below 130/80 mmHg. Immediate return to ER if any weakness recurs.</textarea>
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <button onclick="saveDoctorFollowUp()" id="btnSaveFollowUp" class="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save &amp; Push to Patient
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <button onclick="copySOAP()" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-copy"></i> Copy
+                                    </button>
+                                    <button onclick="window.print()" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-print"></i> Print
+                                    </button>
+                                    <button onclick="sendDoctorEmailToPatient()" class="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition flex items-center gap-1.5" title="Email Follow-up & Care Plan to Patient">
+                                        <i class="fa-solid fa-paper-plane text-blue-600 text-sm"></i> Email Patient Follow-Up
+                                    </button>
+                                </div>
+                                <button onclick="signNote()" id="btnSign" class="px-6 py-2.5 rounded-2xl bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs shadow-md transition flex items-center gap-2">
+                                    <i class="fa-solid fa-signature text-brand-400"></i> Verify, Sign &amp; Export to EHR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================== -->
+            <!-- ADMIN VIEW -->
+            <!-- ============================== -->
+            <div id="roleAdmin" class="app-view space-y-6">
+                <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Administration</span>
+                            <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5">System Dashboard</h2>
+                            <p class="text-xs text-slate-500">Platform metrics, AI model performance, and API health monitoring.</p>
+                        </div>
+                        <button onclick="openApiConfig()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center gap-2 border border-slate-200">
+                            <i class="fa-solid fa-sliders text-brand-600"></i> Configure APIs
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span class="text-slate-400 block text-[11px]">Total Assessments</span>
+                            <strong class="text-2xl font-black text-slate-900 font-mono">1,420</strong>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span class="text-slate-400 block text-[11px]">Brain Scans Analyzed</span>
+                            <strong class="text-2xl font-black text-brand-600 font-mono">384</strong>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span class="text-slate-400 block text-[11px]">AI Model Accuracy</span>
+                            <strong class="text-2xl font-black text-blue-600 font-mono">94.1%</strong>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span class="text-slate-400 block text-[11px]">Model Accuracy</span>
+                            <strong class="text-2xl font-black text-emerald-600 font-mono">95.2%</strong>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 text-xs space-y-2">
+                            <h4 class="font-bold text-slate-800 text-sm">AI Models in Use</h4>
+                            <ul class="list-disc list-inside text-slate-600 space-y-1">
+                                <li><strong>Random Forest:</strong> 100 trees, balanced class weights</li>
+                                <li><strong>Gradient Boosting:</strong> 100 trees, learning rate 0.08</li>
+                                <li><strong>AdaBoost:</strong> 100 estimators, learning rate 0.08</li>
+                                <li><strong>Decision Strategy:</strong> Combined voting from all 3 models</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 text-xs space-y-2">
+                            <h4 class="font-bold text-slate-800 text-sm">API Status</h4>
+                            <div class="space-y-2" id="apiStatusList">
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                                    <span class="font-semibold">LLM (OpenAI / GPT-4)</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">Connected</span>
+                                </div>
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                                    <span class="font-semibold">Speech-to-Text (Groq)</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">Connected</span>
+                                </div>
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                                    <span class="font-semibold">Maps (Google)</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">Connected</span>
+                                </div>
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                                    <span class="font-semibold">Alerts (Twilio)</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-bold">Trial Mode</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- MODALS -->
+    <!-- ================================================================== -->
+
+    <!-- FAST Test Modal -->
+    <div id="fastModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-xs font-bold uppercase text-red-600">Emergency Check</span>
+                    <h3 class="text-lg font-black text-slate-900">F.A.S.T. Warning Signs</h3>
+                </div>
+                <button onclick="closeFastModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-500">Check if any of these symptoms are present right now:</p>
+            <div class="space-y-3 text-xs">
+                <label class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="fastF" class="w-4 h-4 rounded text-red-600 mt-0.5">
+                    <div>
+                        <strong class="text-slate-900 block font-bold"><span class="text-red-600">F</span>ace Drooping</strong>
+                        <span class="text-slate-500">Does one side of the face droop when trying to smile?</span>
+                    </div>
+                </label>
+                <label class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="fastA" class="w-4 h-4 rounded text-red-600 mt-0.5">
+                    <div>
+                        <strong class="text-slate-900 block font-bold"><span class="text-red-600">A</span>rm Weakness</strong>
+                        <span class="text-slate-500">Does one arm drift downward when both arms are raised?</span>
+                    </div>
+                </label>
+                <label class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="fastS" class="w-4 h-4 rounded text-red-600 mt-0.5">
+                    <div>
+                        <strong class="text-slate-900 block font-bold"><span class="text-red-600">S</span>peech Difficulty</strong>
+                        <span class="text-slate-500">Is speech slurred or hard to understand?</span>
+                    </div>
+                </label>
+            </div>
+            <div class="pt-2 flex justify-between gap-3">
+                <button onclick="closeFastModal(); completeStep1();" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold">
+                    No signs, continue assessment
+                </button>
+                <button onclick="triggerEmergency()" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md">
+                    <i class="fa-solid fa-phone mr-1"></i> Call 108 Emergency
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Config Modal -->
+    <div id="apiModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div>
+                    <span class="text-xs font-bold uppercase text-brand-600">System Configuration</span>
+                    <h3 class="text-xl font-black text-slate-900">API Keys &amp; Integrations</h3>
+                </div>
+                <button onclick="closeApiConfig()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3.5 text-xs">
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <strong class="text-slate-900 font-bold flex items-center gap-1.5"><i class="fa-solid fa-brain text-brand-600"></i> AI Clinical Assistant (OpenAI)</strong>
+                    <input type="password" id="cfgLLM" placeholder="Enter API Key..." class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono text-xs">
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <strong class="text-slate-900 font-bold flex items-center gap-1.5"><i class="fa-solid fa-microphone text-blue-600"></i> Voice Recognition (Groq)</strong>
+                    <input type="password" id="cfgSpeech" placeholder="Enter API Key..." class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono text-xs">
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <strong class="text-slate-900 font-bold flex items-center gap-1.5"><i class="fa-solid fa-map-location-dot text-indigo-600"></i> Hospital Finder (Google Maps)</strong>
+                    <input type="password" id="cfgMaps" placeholder="Enter API Key..." class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono text-xs">
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <strong class="text-slate-900 font-bold flex items-center gap-1.5"><i class="fa-solid fa-tower-broadcast text-red-600"></i> Emergency Alerts (Twilio)</strong>
+                    <input type="password" id="cfgTwilio" placeholder="Enter API Key..." class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono text-xs">
+                </div>
+            </div>
+            <div class="pt-2 flex justify-between gap-3">
+                <button onclick="closeApiConfig()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold">Close</button>
+                <button onclick="saveConfig()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- JAVASCRIPT -->
+    <!-- ================================================================== -->
+    <script>
+        let currentRole = null;
+        let maxStep = 1;
+        let isRecording = false;
+        let recognition = null;
+        let currentRiskData = null;
+
+        // ---- VIEW MANAGEMENT ----
+        function showView(viewName) {
+            document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active'));
+            const id = viewName === 'landing' ? 'viewLanding' : viewName === 'auth' ? 'viewAuth' : 'viewApp';
+            document.getElementById(id).classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ---- AUTH & ROLE ----
+        function loginAs(role, name, email) {
+            currentRole = role;
+            document.getElementById('headerName').textContent = name;
+            const s1Name = document.getElementById('step1PatientName');
+            const s1Email = document.getElementById('step1PatientEmail');
+            if (s1Name) s1Name.textContent = `Patient: ${name}`;
+            if (s1Email) s1Email.textContent = `Care plan will be delivered to: ${email}`;
+
+            const carePlanEmail = document.getElementById('carePlanEmailInput');
+            if (carePlanEmail) carePlanEmail.value = email;
+
+            showView('app');
+            switchRole(role);
+            if (role === 'patient') {
+                initSpeech();
+            }
+            if (role === 'doctor') loadQueue();
+        }
+
+        function switchRole(role) {
+            currentRole = role;
+            // Hide all role views
+            ['rolePatient', 'roleDoctor', 'roleAdmin'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            
+            // Show selected role
+            const stepper = document.getElementById('stepperBar');
+            const badge = document.getElementById('roleBadge');
+            const avatar = document.getElementById('userAvatar');
+            
+            // Reset nav tabs
+            ['navPatient', 'navDoctor', 'navAdmin'].forEach(id => {
+                document.getElementById(id).className = 'px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900';
+            });
+
+            if (role === 'patient') {
+                document.getElementById('rolePatient').classList.add('active');
+                stepper.style.display = 'block';
+                badge.textContent = 'Patient';
+                avatar.innerHTML = '<i class="fa-solid fa-user"></i>';
+                document.getElementById('navPatient').className = 'px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-white text-brand-800 shadow-sm font-bold';
+            } else if (role === 'doctor') {
+                document.getElementById('roleDoctor').classList.add('active');
+                stepper.style.display = 'none';
+                badge.textContent = 'Doctor';
+                avatar.innerHTML = '<i class="fa-solid fa-user-doctor"></i>';
+                document.getElementById('navDoctor').className = 'px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-white text-blue-800 shadow-sm font-bold';
+                loadQueue();
+            } else {
+                document.getElementById('roleAdmin').classList.add('active');
+                stepper.style.display = 'none';
+                badge.textContent = 'Admin';
+                avatar.innerHTML = '<i class="fa-solid fa-shield-halved"></i>';
+                document.getElementById('navAdmin').className = 'px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-white text-slate-900 shadow-sm font-bold';
+            }
+        }
+
+        // ---- PATIENT STEPPER ----
+        function navStep(n) {
+            if (n <= maxStep) goStep(n);
+            else alert(`Please complete step ${maxStep} first.`);
+        }
+
+        function goStep(n) {
+            for (let i = 1; i <= 5; i++) {
+                const el = document.getElementById('step-' + i);
+                const dot = document.getElementById('dot' + i);
+                if (el) el.classList.remove('active');
+                if (dot) {
+                    if (i === n) dot.className = 'step-dot active px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0';
+                    else if (i <= maxStep) dot.className = 'step-dot completed px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0';
+                    else dot.className = 'step-dot locked px-3 py-1.5 rounded-xl flex items-center gap-2 transition shrink-0';
+                }
+            }
+            const target = document.getElementById('step-' + n);
+            if (target) target.classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (n === 5) {
+                loadNearbyHospitals();
+            }
+        }
+
+        function completeStep1() {
+            maxStep = Math.max(maxStep, 2);
+            goStep(2);
+        }
+
+        function resetAssessment() {
+            maxStep = 1;
+            goStep(1);
+        }
+
+        // ---- VOICE INPUT ----
+        function initSpeech() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SR();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.onresult = (e) => {
+                    let text = '';
+                    for (let i = e.resultIndex; i < e.results.length; ++i) text += e.results[i][0].transcript;
+                    const ta = document.getElementById('symptomsInput');
+                    if (ta && text) { ta.value = text; detectSymptoms(); }
+                };
+            }
+        }
+
+        function toggleVoice() {
+            const btn = document.getElementById('voiceBtn');
+            const icon = document.getElementById('voiceIcon');
+            const label = document.getElementById('voiceLabel');
+            if (!isRecording) {
+                isRecording = true;
+                if (recognition) try { recognition.start(); } catch(e) {}
+                btn.className = 'px-3.5 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs flex items-center gap-2 border border-red-200 recording-pulse';
+                icon.className = 'fa-solid fa-circle text-red-600 animate-ping';
+                label.textContent = 'Listening...';
+            } else {
+                isRecording = false;
+                if (recognition) try { recognition.stop(); } catch(e) {}
+                btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition';
+                icon.className = 'fa-solid fa-microphone text-brand-600';
+                label.textContent = 'Voice Input';
+            }
+        }
+
+        // ---- SYMPTOM DETECTION (NLP) ----
+        let nlpDebounce = null;
+        async function detectSymptoms() {
+            clearTimeout(nlpDebounce);
+            nlpDebounce = setTimeout(async () => {
+                const text = document.getElementById('symptomsInput').value;
+                if (!text.trim()) {
+                    document.getElementById('detectedSymptoms').innerHTML = '<span class="px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 font-semibold text-[11px]">Type your symptoms above</span>';
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/nlp_parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+                    const data = await res.json();
+                    const box = document.getElementById('detectedSymptoms');
+                    box.innerHTML = '';
+                    if (data.entities && data.entities.length > 0) {
+                        data.entities.forEach(ent => {
+                            const span = document.createElement('span');
+                            const cat = (ent.category || 'symptom').toLowerCase();
+                            const catClass = `entity-badge-${cat}`;
+                            const isNeg = ent.negated;
+                            
+                            const catNames = { symptom: 'Symptom', diagnosis: 'Condition', medication: 'Medicine', procedure: 'Test', demographics: 'Patient' };
+                            const catLabel = catNames[cat] || cat;
+                            const title = ent.concept || ent.entity;
+                            
+                            if (isNeg) {
+                                span.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 line-through flex items-center gap-1.5 shadow-sm';
+                                span.innerHTML = `<i class="fa-solid fa-ban text-slate-400"></i> <span>Ruled out: ${title}</span> <span class="text-[10px] opacity-75">(${catLabel})</span>`;
+                            } else {
+                                span.className = `px-3 py-1 rounded-full text-xs font-bold ${catClass} flex items-center gap-1.5 shadow-sm`;
+                                span.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>${title}</span> <span class="text-[10px] opacity-75 font-normal">(${catLabel})</span>`;
+                            }
+                            box.appendChild(span);
+                        });
+                    } else {
+                        box.innerHTML = '<span class="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">No medical signs detected yet — describe your symptoms above</span>';
+                    }
+                } catch (e) {
+                    console.error('NLP error', e);
+                }
+            }, 300);
+        }
+
+        function setSample(type) {
+            const ta = document.getElementById('symptomsInput');
+            if (type === 'acute') {
+                ta.value = 'I have sudden right arm weakness, my face is drooping on one side, and I can\'t speak properly. It started about 2 hours ago. I also have a bad headache.';
+            } else {
+                ta.value = 'I sometimes feel dizzy in the morning and have mild headaches. I\'m taking blood pressure medication. No chest pain or numbness.';
+            }
+            detectSymptoms();
+        }
+
+        // ---- HEALTH ANALYSIS ----
+        async function analyzeHealth() {
+            const age = parseFloat(document.getElementById('inputAge').value);
+            const glucose = parseFloat(document.getElementById('inputGlucose').value);
+            const bmi = parseFloat(document.getElementById('inputBmi').value);
+            const notes = document.getElementById('symptomsInput').value.trim();
+            const alertBox = document.getElementById('validationAlert');
+            const alertMsg = document.getElementById('validationMsg');
+
+            // Clear previous errors
+            ['inputAge', 'inputGlucose', 'inputBmi', 'symptomsInput'].forEach(id => {
+                document.getElementById(id).classList.remove('border-red-500', 'bg-red-50');
+            });
+
+            // Validate
+            if (!notes) { showError('symptomsInput', 'Please describe your symptoms first.'); return; }
+            if (isNaN(age) || age < 18 || age > 110) { showError('inputAge', 'Please enter a valid age (18-110).'); return; }
+            if (isNaN(glucose) || glucose < 40 || glucose > 400) { showError('inputGlucose', 'Please enter a valid blood sugar level (40-400).'); return; }
+            if (isNaN(bmi) || bmi < 10 || bmi > 70) { showError('inputBmi', 'Please enter a valid BMI (10-70).'); return; }
+
+            alertBox.classList.add('hidden');
+
+            const btn = document.getElementById('btnAnalyze');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Analyzing your health...</span>';
+
+            const payload = {
+                gender: 1, age, hypertension: document.getElementById('inputHypertension').checked ? 1 : 0,
+                heart_disease: document.getElementById('inputHeartDisease').checked ? 1 : 0,
+                ever_married: 1, work_type: 2, Residence_type: 1,
+                avg_glucose_level: glucose, bmi, smoking_status: parseInt(document.getElementById('inputSmoking').value)
+            };
+
+            try {
+                const res = await fetch('/api/predict_risk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) throw new Error('Server error ' + res.status);
+                const data = await res.json();
+                currentRiskData = data;
+                showResults(data, glucose);
+            } catch (e) {
+                alertMsg.textContent = 'Error analyzing health. Please make sure the system is running.';
+                alertBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Analyze My Health &rarr;</span>';
+            }
+        }
+
+        function showError(fieldId, msg) {
+            document.getElementById(fieldId).classList.add('border-red-500', 'bg-red-50');
+            document.getElementById('validationMsg').textContent = msg;
+            document.getElementById('validationAlert').classList.remove('hidden');
+            document.getElementById(fieldId).focus();
+        }
+
+        function showResults(data, glucose) {
+            const prob = data.risk_score_percent;
+            document.getElementById('riskPercent').textContent = `${prob.toFixed(1)}%`;
+            document.getElementById('riskBadge').textContent = data.risk_tier.toUpperCase();
+            document.getElementById('finalRisk').textContent = `${prob.toFixed(1)}% (${data.risk_tier})`;
+            document.getElementById('finalGlucose').textContent = `${glucose.toFixed(1)} mg/dL`;
+
+            // Gauge
+            const circle = document.getElementById('gaugeCircle');
+            circle.style.strokeDashoffset = 314.15 - (prob / 100) * 314.15;
+            circle.setAttribute('stroke', prob >= 75 ? '#ef4444' : prob >= 60 ? '#f97316' : prob >= 30 ? '#f59e0b' : '#10b981');
+
+            // Risk badge color
+            const badge = document.getElementById('riskBadge');
+            if (prob >= 75) { badge.className = 'px-4 py-1.5 rounded-full bg-red-100 text-red-700 font-bold text-xs border border-red-200'; }
+            else if (prob >= 60) { badge.className = 'px-4 py-1.5 rounded-full bg-orange-100 text-orange-700 font-bold text-xs border border-orange-200'; }
+            else if (prob >= 30) { badge.className = 'px-4 py-1.5 rounded-full bg-yellow-100 text-yellow-700 font-bold text-xs border border-yellow-200'; }
+            else { badge.className = 'px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200'; }
+
+            // Risk factors
+            const box = document.getElementById('riskFactorsBox');
+            box.innerHTML = '';
+            if (data.xai && data.xai.attributions) {
+                data.xai.attributions.slice(0, 4).forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 rounded-xl bg-slate-50 border border-slate-100 flex justify-between items-center';
+                    div.innerHTML = `
+                        <div>
+                            <strong class="text-slate-900 block font-semibold">${item.feature} (${item.value})</strong>
+                            <span class="text-[10px] text-slate-500">${item.rationale}</span>
+                        </div>
+                        <span class="font-mono font-bold ${item.impact > 0 ? 'text-red-600' : 'text-emerald-600'}">${item.impact_sign}${Math.abs(item.impact).toFixed(2)}</span>
+                    `;
+                    box.appendChild(div);
+                });
+            }
+
+            maxStep = Math.max(maxStep, 3);
+            goStep(3);
+        }
+
+        // ---- SCAN NAVIGATION & UPLOAD ----
+        let patientUploadedScan = null;
+
+        function goToScan() {
+            maxStep = Math.max(maxStep, 4);
+            // Don't auto-load or pre-populate images! Show upload dropzone
+            if (!patientUploadedScan) {
+                resetScanUpload();
+            }
+            goStep(4);
+        }
+
+        async function handlePatientScanUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const badge = document.getElementById('scanStatusBadge');
+            badge.className = 'px-3.5 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-200';
+            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Processing Uploaded Scan...';
+
+            const form = new FormData();
+            form.append('image', file);
+            form.append('threshold_offset', 0);
+
+            try {
+                const res = await fetch('/api/segment_mri', { method: 'POST', body: form });
+                if (!res.ok) throw new Error('Segmentation failed');
+                const data = await res.json();
+                patientUploadedScan = file.name;
+                renderScanResults(data, `Uploaded: ${file.name}`);
+            } catch (e) {
+                console.error('Scan upload error', e);
+                alert('Could not process this image file. Please ensure it is a valid brain MRI or CT scan snapshot.');
+                resetScanUpload();
+            }
+        }
+
+        async function loadSampleScan(sampleName, label) {
+            const badge = document.getElementById('scanStatusBadge');
+            badge.className = 'px-3.5 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-200';
+            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Analyzing Demo Scan...';
+
+            const form = new FormData();
+            form.append('sample_name', sampleName);
+            form.append('threshold_offset', 0);
+
+            try {
+                const res = await fetch('/api/segment_mri', { method: 'POST', body: form });
+                const data = await res.json();
+                patientUploadedScan = label;
+                renderScanResults(data, label);
+            } catch (e) {
+                console.error('Scan error', e);
+            }
+        }
+
+        function renderScanResults(data, sourceLabel) {
+            document.getElementById('scanUploadArea').classList.add('hidden');
+            document.getElementById('scanResultsArea').classList.remove('hidden');
+
+            const badge = document.getElementById('scanStatusBadge');
+            badge.className = 'px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200';
+            badge.innerHTML = `<i class="fa-solid fa-circle-check mr-1 text-emerald-600"></i> ${sourceLabel}`;
+
+            document.getElementById('scanImg').src = data.stages.overlay;
+            const docThumb = document.getElementById('docMriThumb');
+            if (docThumb) docThumb.src = data.stages.overlay;
+
+            document.getElementById('scanArea').textContent = `${data.metrics.lesion_ratio_percent.toFixed(1)}%`;
+            document.getElementById('finalScan').textContent = `${data.metrics.lesion_territory} (${data.metrics.lesion_ratio_percent.toFixed(1)}%)`;
+            document.getElementById('scanScore').textContent = `${data.metrics.aspects_score} / 10`;
+            document.getElementById('scanTerritory').textContent = data.metrics.lesion_territory;
+            document.getElementById('scanTitle').textContent = `${data.metrics.lesion_territory} Detected`;
+            document.getElementById('scanSummary').innerHTML = `AI analysis identified tissue changes in the <strong>${data.metrics.lesion_territory}</strong> territory, measuring <strong>${data.metrics.lesion_ratio_percent.toFixed(1)}%</strong> of the hemisphere.`;
+        }
+
+        function resetScanUpload() {
+            patientUploadedScan = null;
+            const fileInput = document.getElementById('patientScanFileInput');
+            if (fileInput) fileInput.value = '';
+            document.getElementById('scanUploadArea').classList.remove('hidden');
+            document.getElementById('scanResultsArea').classList.add('hidden');
+            const badge = document.getElementById('scanStatusBadge');
+            badge.className = 'px-3.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200';
+            badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1 text-slate-400"></i> No Scan Uploaded Yet';
+            document.getElementById('finalScan').textContent = 'No scan uploaded';
+        }
+
+        function skipToCarePlan() {
+            maxStep = Math.max(maxStep, 5);
+            if (!patientUploadedScan) {
+                document.getElementById('finalScan').textContent = 'No scan uploaded';
+            }
+            goStep(5);
+        }
+
+        function goToCarePlan() {
+            maxStep = Math.max(maxStep, 5);
+            goStep(5);
+        }
+
+        async function saveDoctorFollowUp() {
+            const timeline = document.getElementById('docFollowUpTimeline').value;
+            const type = document.getElementById('docFollowUpType').value;
+            const notes = document.getElementById('docFollowUpNotes').value.trim();
+            const btn = document.getElementById('btnSaveFollowUp');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...';
+            }
+
+            try {
+                const res = await fetch('/api/doctor_followup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_id: 'PT-4091',
+                        timeline: timeline,
+                        consultation_type: type,
+                        doctor_name: 'Dr. Sarah Lin, MD',
+                        instructions: notes
+                    })
+                });
+                const data = await res.json();
+                
+                // Update Patient Care Plan Display
+                const timingEl = document.getElementById('followUpTimingDisplay');
+                const typeEl = document.getElementById('followUpTypeDisplay');
+                const instrEl = document.getElementById('followUpInstructionsDisplay');
+                if (timingEl) timingEl.textContent = timeline;
+                if (typeEl) typeEl.textContent = type;
+                if (instrEl) instrEl.textContent = `"${notes}"`;
+                
+                alert('Doctor Follow-up Order saved! The patient care plan has been updated with these instructions.');
+            } catch (e) {
+                console.error('Follow-up error', e);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-check text-emerald-300"></i> Saved &amp; Updated';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save &amp; Push to Patient';
+                    }, 2500);
+                }
+            }
+        }
+
+        // ---- DOCTOR FUNCTIONS ----
+        async function loadQueue() {
+            try {
+                const res = await fetch('/api/patients_queue');
+                const list = await res.json();
+                const container = document.getElementById('queueList');
+                if (!container) return;
+                container.innerHTML = '';
+                list.forEach((p, i) => {
+                    const item = document.createElement('div');
+                    item.className = `p-3.5 rounded-2xl border cursor-pointer transition ${i === 0 ? 'bg-brand-50 border-brand-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`;
+                    item.onclick = () => selectPatient(p);
+                    item.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <strong class="text-slate-900 block font-bold">${p.name} (${p.age}y)</strong>
+                            <span class="font-mono font-bold ${p.risk_score > 60 ? 'text-red-600' : 'text-emerald-600'}">${p.risk_score}% Risk</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                            <span>${p.id} &bull; ${p.fast_result}</span>
+                            <span class="font-bold text-brand-800">${p.doctor_status}</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            } catch (e) { console.error('Queue error', e); }
+        }
+
+        function selectPatient(p) {
+            document.getElementById('transcript').textContent = `"${p.notes || 'Patient records loaded.'}"`;
+            generateSOAP(p);
+        }
+
+        async function generateSOAP(p = null) {
+            const payload = {
+                patient_id: p ? p.id : 'PT-4091', patient_name: p ? p.name : 'John Doe',
+                age: p ? p.age : 67, gender: p ? p.gender : 'Male',
+                symptoms: p ? p.notes : 'Sudden right arm weakness, facial droop, slurred speech.',
+                glucose: p ? p.glucose : 218.4, bmi: p ? p.bmi : 32.2,
+                hypertension: true, heart_disease: true, smoking: 'Formerly Smoked',
+                fast_status: 'Positive', risk_score: p ? p.risk_score : 84.6,
+                api_key: localStorage.getItem('cognicare_llm_key') || ''
+            };
+            try {
+                const res = await fetch('/api/generate_soap_note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                document.getElementById('soapS').value = `${data.subjective.chief_complaint} ${data.subjective.hpi} ${data.subjective.past_medical_history}`;
+                document.getElementById('soapO').value = `Vitals: ${data.objective.vitals_biomarkers} ${data.objective.neuro_exam} Imaging: ${data.objective.imaging_mri}`;
+                document.getElementById('soapA').value = `${data.assessment.primary_diagnosis}. ${data.assessment.risk_stratification}. Codes: ${data.assessment.icd10_codes.map(c => `${c.code} (${c.description})`).join(', ')}`;
+                document.getElementById('soapP').value = `${data.plan.immediate_actions.join(' ')}\nFollow-up: ${data.plan.follow_up}`;
+            } catch (e) { console.error('SOAP error', e); }
+        }
+
+        async function signNote() {
+            const btn = document.getElementById('btnSign');
+            btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Signed & Exported';
+            btn.className = 'px-6 py-2.5 rounded-2xl bg-emerald-700 text-white font-bold text-xs shadow-md transition flex items-center gap-2';
+            await fetch('/api/doctor_override', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'PT-4091', action: 'Signed & Approved by Dr. Sarah Lin' }) });
+            setTimeout(() => { alert('SOAP Note signed and exported to EHR!'); loadQueue(); }, 300);
+        }
+
+        function copySOAP() {
+            const note = `=== CLINICAL SOAP NOTE ===\n\nSUBJECTIVE:\n${document.getElementById('soapS').value}\n\nOBJECTIVE:\n${document.getElementById('soapO').value}\n\nASSESSMENT:\n${document.getElementById('soapA').value}\n\nPLAN:\n${document.getElementById('soapP').value}`;
+            navigator.clipboard.writeText(note);
+            alert('SOAP Note copied!');
+        }
+
+        // ---- DOCTOR & PATIENT EMAIL CARE PLAN DISPATCH ----
+
+        function sendDoctorEmailToPatient() {
+            const targetEmail = prompt("Confirm Patient Email for Follow-up & Care Plan delivery:", currentPatient.email || 'john.doe@email.com');
+            if (targetEmail) {
+                currentPatient.email = targetEmail;
+                const emailInput = document.getElementById('carePlanEmailInput');
+                if (emailInput) emailInput.value = targetEmail;
+                sendCarePlanEmail();
+            }
+        }
+
+        // ---- PATIENT INTAKE & EMAIL CARE PLAN DISPATCH ----
+        let currentPatient = { name: 'John Doe', email: 'john.doe@email.com', phone: '+91 98765 43210' };
+        let lastSentEmailHtml = '';
+
+        function startPatientAssessment() {
+            const name = document.getElementById('patientRegName')?.value.trim();
+            const email = document.getElementById('patientRegEmail')?.value.trim();
+            const phone = document.getElementById('patientRegPhone')?.value.trim() || '+91 98765 43210';
+
+            if (!name) {
+                alert('Please enter your full name before starting.');
+                document.getElementById('patientRegName')?.focus();
+                return;
+            }
+            if (!email || !email.includes('@')) {
+                alert('Please enter a valid email address to receive your care plan.');
+                document.getElementById('patientRegEmail')?.focus();
+                return;
+            }
+
+            currentPatient = { name, email, phone };
+            
+            // Sync values to all patient fields
+            const headerName = document.getElementById('headerName');
+            const emailInput = document.getElementById('carePlanEmailInput');
+            if (headerName) headerName.textContent = name;
+            if (emailInput) emailInput.value = email;
+
+            loginAs('patient', name, email);
+        }
+
+        // ---- NEARBY STROKE HOSPITALS RECOMMENDATION ----
+        let cachedHospitals = null;
+        let hasRequestedGeo = false;
+
+        async function loadNearbyHospitals(forceLocation = false) {
+            const container = document.getElementById('hospitalsListContainer');
+            if (!container) return;
+
+            if (cachedHospitals && !forceLocation && container.children.length > 0) {
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="col-span-1 md:col-span-3 text-center py-6 text-slate-400 text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-notch fa-spin text-brand-600 text-base"></i>
+                    <span>Finding nearest 24/7 accredited stroke centers and live travel ETAs...</span>
+                </div>
+            `;
+
+            let userLat = 19.3828;
+            let userLng = 72.8290;
+
+            const fetchAndRender = async (lat, lng) => {
+                try {
+                    const res = await fetch(`/api/hospitals?user_lat=${lat}&user_lng=${lng}`);
+                    const hospitals = await res.json();
+                    cachedHospitals = hospitals;
+                    if (!container) return;
+                    container.innerHTML = '';
+
+                    hospitals.forEach((h) => {
+                        const card = document.createElement('div');
+                        card.className = 'p-4 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-brand-300 hover:shadow-md transition space-y-3 flex flex-col justify-between';
+                        card.innerHTML = `
+                            <div>
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <i class="fa-solid fa-certificate text-emerald-600"></i> Stroke Certified
+                                    </span>
+                                    <span class="text-[11px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <i class="fa-solid fa-car text-[10px]"></i> ${h.eta || 'Fast ETA'}
+                                    </span>
+                                </div>
+                                <h4 class="font-extrabold text-slate-900 text-xs leading-snug">${h.name}</h4>
+                                <p class="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-location-dot text-rose-500 text-[11px]"></i>
+                                    <span>${h.address}</span>
+                                </p>
+                                <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 mt-2.5 font-mono">
+                                    <span class="bg-white border border-slate-200 px-2 py-0.5 rounded"><i class="fa-solid fa-route text-indigo-500 mr-1"></i>${h.distance}</span>
+                                    <span class="bg-white border border-slate-200 px-2 py-0.5 rounded"><i class="fa-solid fa-bolt text-amber-500 mr-1"></i>24/7 r-tPA</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-200">
+                                <a href="tel:${h.phone}" class="py-2 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-center font-bold text-[11px] flex items-center justify-center gap-1.5 transition shadow-sm">
+                                    <i class="fa-solid fa-phone text-[10px]"></i> Call ER
+                                </a>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" class="py-2 px-2 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-center font-bold text-[11px] flex items-center justify-center gap-1.5 transition">
+                                    <i class="fa-solid fa-diamond-turn-right text-[10px]"></i> Directions
+                                </a>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                } catch (err) {
+                    console.error('Error fetching hospitals:', err);
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="col-span-1 md:col-span-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-600">
+                                Stroke emergency centers directory active. Call <strong>108</strong> for immediate dispatch.
+                            </div>
+                        `;
+                    }
+                }
+            };
+
+            if (navigator.geolocation && (forceLocation || !hasRequestedGeo)) {
+                hasRequestedGeo = true;
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        userLat = pos.coords.latitude;
+                        userLng = pos.coords.longitude;
+                        fetchAndRender(userLat, userLng);
+                    },
+                    (err) => {
+                        fetchAndRender(userLat, userLng);
+                    },
+                    { timeout: 3500 }
+                );
+            } else {
+                fetchAndRender(userLat, userLng);
+            }
+        }
+
+        async function sendCarePlanEmail() {
+            const emailInput = document.getElementById('carePlanEmailInput');
+            const email = emailInput ? emailInput.value.trim() : (currentPatient.email || 'john.doe@email.com');
+            const btn = document.getElementById('btnSendEmail');
+            const toast = document.getElementById('emailSuccessToast');
+            const msgSpan = document.getElementById('emailToastMsg');
+
+            if (!email || !email.includes('@')) {
+                alert('Please enter a valid email address.');
+                if (emailInput) emailInput.focus();
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xs"></i> <span>Sending Email...</span>';
+            }
+
+            const riskScore = currentRiskData ? currentRiskData.risk_score_percent : 84.6;
+            const riskTier = currentRiskData ? currentRiskData.risk_tier : 'High / Urgent Risk';
+            const glucose = parseFloat(document.getElementById('inputGlucose')?.value) || 218.4;
+            const bmi = parseFloat(document.getElementById('inputBmi')?.value) || 32.2;
+            const scanFinding = document.getElementById('finalScan')?.textContent || 'Left Brain Area (18.4%)';
+            const patientName = currentPatient.name || document.getElementById('headerName')?.textContent || 'John Doe';
+
+            const followUpTimeline = document.getElementById('followUpTimingDisplay')?.textContent || 'In 48 Hours';
+            const followUpType = document.getElementById('followUpTypeDisplay')?.textContent || 'In-Person Clinic Visit';
+            const followUpNotes = (document.getElementById('followUpInstructionsDisplay')?.textContent || '').replace(/^"|"$/g, '');
+
+            const payload = {
+                patient_name: patientName,
+                email: email,
+                risk_score: riskScore,
+                risk_tier: riskTier,
+                glucose: glucose,
+                bmi: bmi,
+                mri_finding: scanFinding,
+                doctor_name: 'Dr. Sarah Lin, MD',
+                follow_up_timeline: followUpTimeline,
+                follow_up_type: followUpType,
+                follow_up_notes: followUpNotes
+            };
+
+            try {
+                const res = await fetch('/api/send_email_careplan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                lastSentEmailHtml = data.html_preview || '';
+
+                if (toast) {
+                    toast.classList.remove('hidden');
+                    if (msgSpan) {
+                        msgSpan.textContent = `Care plan delivered to ${data.recipient}!`;
+                    }
+                }
+            } catch (e) {
+                console.error('Email error', e);
+                alert('Email preparation completed. Click "View Sent Email" to inspect your report.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-check text-xs"></i> <span>Email Sent!</span>';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-xs"></i> <span>Send to My Email</span>';
+                    }, 3500);
+                }
+            }
+        }
+
+        function openEmailPreviewModal() {
+            const modal = document.getElementById('emailPreviewModal');
+            const container = document.getElementById('emailModalContent');
+            const sub = document.getElementById('emailModalSubject');
+            const rec = document.getElementById('emailModalRecipient');
+            
+            if (sub) sub.textContent = `Care Plan: ${currentPatient.name}`;
+            if (rec) rec.textContent = `Recipient: ${document.getElementById('carePlanEmailInput')?.value || currentPatient.email}`;
+            if (container) {
+                container.innerHTML = `<iframe srcdoc="${lastSentEmailHtml.replace(/"/g, '&quot;')}" class="w-full h-[520px] rounded-xl border border-slate-200 bg-white"></iframe>`;
+            }
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeEmailPreviewModal() {
+            document.getElementById('emailPreviewModal')?.classList.add('hidden');
+        }
+
+        // ---- MODALS ----
+        function openFastModal() { document.getElementById('fastModal').classList.remove('hidden'); }
+        function closeFastModal() { document.getElementById('fastModal').classList.add('hidden'); }
+        function openApiConfig() { document.getElementById('apiModal').classList.remove('hidden'); }
+        function closeApiConfig() { document.getElementById('apiModal').classList.add('hidden'); }
+
+        function saveConfig() {
+            const k = document.getElementById('cfgLLM').value.trim();
+            if (k) localStorage.setItem('cognicare_llm_key', k);
+            alert('Configuration saved!');
+            closeApiConfig();
+        }
+
+        function triggerEmergency() {
+            closeFastModal();
+            window.location.href = 'tel:108';
+        }
+
+        // Auto-initialize hospitals on initial page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNearbyHospitals();
+        });
+    </script>
+
+    <!-- Email Preview Modal -->
+    <div id="emailPreviewModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg shrink-0">
+                        <i class="fa-solid fa-envelope-open-text"></i>
+                    </div>
+                    <div>
+                        <strong class="text-sm font-extrabold text-slate-900 block" id="emailModalSubject">Care Plan Email Preview</strong>
+                        <span class="text-xs text-slate-500" id="emailModalRecipient">Recipient: ...</span>
+                    </div>
+                </div>
+                <button onclick="closeEmailPreviewModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden" id="emailModalContent">
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
+                <span class="text-slate-400 text-[11px]"><i class="fa-solid fa-shield-check text-emerald-500 mr-1"></i> Formatted for desktop &amp; mobile inboxes</span>
+                <button onclick="closeEmailPreviewModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

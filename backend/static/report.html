@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIH Project Hub — Shruti Gauchandra (Roll No. 15)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .header-bar {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .badge-student {
+            background: #2563eb;
+            color: white;
+            font-size: 0.9rem;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+        .btn-custom {
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.88rem;
+        }
+        .main-container {
+            display: flex;
+            height: calc(100vh - 65px);
+        }
+        .doc-frame {
+            flex: 1;
+            height: 100%;
+            border: none;
+            background: #1e293b;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <div class="d-flex align-items-center gap-3">
+            <span class="fs-5 fw-bold text-white">🧠 CogniCare AI: Project Deliverables</span>
+            <span class="badge-student">Shruti Gauchandra — Roll No. 15</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="/static/CogniCare_AI_Mini_Project_Presentation.pptx" download class="btn btn-warning btn-custom">
+                <i class="fa-solid fa-file-powerpoint"></i> Download PPTX
+            </a>
+            <a href="/static/CogniCare_AI_Mini_Project_Presentation.pdf" target="_blank" class="btn btn-outline-warning btn-custom">
+                <i class="fa-solid fa-file-pdf"></i> View Slides PDF
+            </a>
+            <a href="/static/EXP_10_CogniCare_AI_Mini_Project_Report.docx" download class="btn btn-outline-light btn-custom">
+                <i class="fa-solid fa-file-word"></i> Download Report DOCX
+            </a>
+            <a href="/static/EXP_10_CogniCare_AI_Mini_Project_Report.pdf" target="_blank" class="btn btn-primary btn-custom">
+                <i class="fa-solid fa-file-pdf"></i> View Report PDF
+            </a>
+        </div>
+    </div>
+    <div class="main-container">
+        <iframe class="doc-frame" src="/static/CogniCare_AI_Mini_Project_Presentation.pdf#toolbar=1&navpanes=1"></iframe>
+    </div>
+</body>
+</html>
