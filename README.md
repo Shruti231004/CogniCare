@@ -83,6 +83,10 @@ Stroke is the **second leading cause of death globally** and a primary cause of 
 
 ## 🏗️ System Architecture
 
+<p align="center">
+  <img src="architecture_diagram.png" alt="CogniCare AI System Architecture" width="850">
+</p>
+
 ```mermaid
 flowchart TD
     subgraph UI ["Modern Client Layer (TailwindCSS + Vanilla JS)"]
@@ -216,6 +220,10 @@ Physicians can inspect cases, review triage scores, and manage continuity of car
 ---
 
 ## 🖥️ Role-Based Workflows
+
+<p align="center">
+  <img src="user_flow_diagram.png" alt="CogniCare AI User Journey Diagram" width="850">
+</p>
 
 <div align="center">
 
